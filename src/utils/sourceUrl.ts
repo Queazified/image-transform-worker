@@ -1,3 +1,5 @@
+import { validateRemoteUrl } from './validation';
+
 function isIpLiteral(hostname: string): boolean {
   // IPv4 literal
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
@@ -8,7 +10,7 @@ function isIpLiteral(hostname: string): boolean {
   return hostname.includes(':');
 }
 
-export function buildSourceFetchCandidates(sourceUrl: URL): URL[] {
+export function buildSourceFetchCandidates(sourceUrl: URL, blockedHostsRaw?: string): URL[] {
   const candidates = [new URL(sourceUrl.toString())];
 
   if (sourceUrl.hostname.startsWith('www.')) {
@@ -18,7 +20,13 @@ export function buildSourceFetchCandidates(sourceUrl: URL): URL[] {
     if (!isIpLiteral(strippedHost)) {
       const withoutWww = new URL(sourceUrl.toString());
       withoutWww.hostname = strippedHost;
-      candidates.push(withoutWww);
+
+      try {
+        validateRemoteUrl(withoutWww, blockedHostsRaw);
+        candidates.push(withoutWww);
+      } catch {
+        // Ignore blocked fallback candidates.
+      }
     }
   }
 

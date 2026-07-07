@@ -18,8 +18,16 @@ describe('buildSourceFetchCandidates', () => {
     expect(candidates.map((value) => value.toString())).toEqual(['https://example.com/logo.svg']);
   });
 
-  it('does not add fallback when stripping www would yield an IP literal', () => {
-    const candidates = buildSourceFetchCandidates(new URL('https://www.127.0.0.1/logo.svg'));
-    expect(candidates.map((value) => value.toString())).toEqual(['https://www.127.0.0.1/logo.svg']);
+  it('does not add fallback when stripped host is blocked by default rules', () => {
+    const candidates = buildSourceFetchCandidates(new URL('https://www.localhost/logo.svg'));
+    expect(candidates.map((value) => value.toString())).toEqual(['https://www.localhost/logo.svg']);
+  });
+
+  it('does not add fallback when stripped host is blocked by custom rules', () => {
+    const candidates = buildSourceFetchCandidates(
+      new URL('https://www.example.com/logo.svg'),
+      'example.com'
+    );
+    expect(candidates.map((value) => value.toString())).toEqual(['https://www.example.com/logo.svg']);
   });
 });

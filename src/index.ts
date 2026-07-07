@@ -35,11 +35,15 @@ function createCacheResponse(body: Uint8Array): Response {
   });
 }
 
-async function processSvgToPng(sourceUrl: URL, options: TransformOptions): Promise<Response> {
+async function processSvgToPng(
+  sourceUrl: URL,
+  options: TransformOptions,
+  blockedHostsRaw?: string
+): Promise<Response> {
   let lastStatus = 502;
   let upstreamResponse: Response | null = null;
 
-  for (const candidateUrl of buildSourceFetchCandidates(sourceUrl)) {
+  for (const candidateUrl of buildSourceFetchCandidates(sourceUrl, blockedHostsRaw)) {
     try {
       const response = await fetch(candidateUrl.toString(), {
         method: 'GET',
@@ -100,13 +104,13 @@ async function handleTransformRequest(request: Request, env: Env): Promise<Respo
 
   let response: Response;
   if (route.kind === 'svg-to-png') {
-    response = await processSvgToPng(sourceUrl, options);
+    response = await processSvgToPng(sourceUrl, options, env.BLOCKED_HOSTS);
   } else {
     if (route.format !== 'png') {
       throw new HttpError(400, `Unsupported format '${route.format}'.`);
     }
 
-    response = await processSvgToPng(sourceUrl, options);
+    response = await processSvgToPng(sourceUrl, options, env.BLOCKED_HOSTS);
   }
 
   await cache.put(cacheKey, response.clone());
