@@ -1,0 +1,6 @@
+name = "image-transform-worker"
+main = "src/index.ts"
+compatibility_date = "2026-07-07"
+
+[observability]
+enabled = true
