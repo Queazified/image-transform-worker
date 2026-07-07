@@ -4,6 +4,7 @@ import type { TransformOptions } from './types';
 import { handlePreflight, withCors } from './utils/cors';
 import { HttpError } from './utils/errors';
 import { parseTransformOptions } from './utils/options';
+import { buildSourceFetchCandidates } from './utils/sourceUrl';
 import { decodeImageUrl, readWithLimit, validateRemoteUrl } from './utils/validation';
 
 interface Env {
@@ -35,16 +36,32 @@ function createCacheResponse(body: Uint8Array): Response {
 }
 
 async function processSvgToPng(sourceUrl: URL, options: TransformOptions): Promise<Response> {
-  const upstreamResponse = await fetch(sourceUrl.toString(), {
-    method: 'GET',
-    redirect: 'follow',
-    cf: {
-      cacheEverything: false,
-    },
-  });
+  let lastStatus = 502;
+  let upstreamResponse: Response | null = null;
 
-  if (!upstreamResponse.ok) {
-    throw new HttpError(upstreamResponse.status, 'Failed to fetch source image.');
+  for (const candidateUrl of buildSourceFetchCandidates(sourceUrl)) {
+    try {
+      const response = await fetch(candidateUrl.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        cf: {
+          cacheEverything: false,
+        },
+      });
+
+      if (response.ok) {
+        upstreamResponse = response;
+        break;
+      }
+
+      lastStatus = response.status;
+    } catch {
+      lastStatus = 502;
+    }
+  }
+
+  if (!upstreamResponse) {
+    throw new HttpError(lastStatus, 'Failed to fetch source image.');
   }
 
   const svg = await readWithLimit(upstreamResponse, 'image/svg+xml');
