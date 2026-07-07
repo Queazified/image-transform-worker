@@ -4,6 +4,7 @@ import type { TransformOptions } from './types';
 import { handlePreflight, withCors } from './utils/cors';
 import { HttpError } from './utils/errors';
 import { parseTransformOptions } from './utils/options';
+import { buildSourceFetchCandidates } from './utils/sourceUrl';
 import { decodeImageUrl, readWithLimit, validateRemoteUrl } from './utils/validation';
 
 interface Env {
@@ -34,17 +35,38 @@ function createCacheResponse(body: Uint8Array): Response {
   });
 }
 
-async function processSvgToPng(sourceUrl: URL, options: TransformOptions): Promise<Response> {
-  const upstreamResponse = await fetch(sourceUrl.toString(), {
-    method: 'GET',
-    redirect: 'follow',
-    cf: {
-      cacheEverything: false,
-    },
-  });
+async function processSvgToPng(
+  sourceUrl: URL,
+  options: TransformOptions,
+  blockedHostsRaw?: string
+): Promise<Response> {
+  let lastStatus = 502;
+  let upstreamResponse: Response | null = null;
 
-  if (!upstreamResponse.ok) {
-    throw new HttpError(upstreamResponse.status, 'Failed to fetch source image.');
+  for (const candidateUrl of buildSourceFetchCandidates(sourceUrl, blockedHostsRaw)) {
+    try {
+      const response = await fetch(candidateUrl.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        cf: {
+          cacheEverything: false,
+        },
+      });
+
+      if (response.ok) {
+        upstreamResponse = response;
+        break;
+      }
+
+      response.body?.cancel();
+      lastStatus = response.status;
+    } catch {
+      lastStatus = 502;
+    }
+  }
+
+  if (!upstreamResponse) {
+    throw new HttpError(lastStatus, 'Failed to fetch source image.');
   }
 
   const svg = await readWithLimit(upstreamResponse, 'image/svg+xml');
@@ -82,13 +104,13 @@ async function handleTransformRequest(request: Request, env: Env): Promise<Respo
 
   let response: Response;
   if (route.kind === 'svg-to-png') {
-    response = await processSvgToPng(sourceUrl, options);
+    response = await processSvgToPng(sourceUrl, options, env.BLOCKED_HOSTS);
   } else {
     if (route.format !== 'png') {
       throw new HttpError(400, `Unsupported format '${route.format}'.`);
     }
 
-    response = await processSvgToPng(sourceUrl, options);
+    response = await processSvgToPng(sourceUrl, options, env.BLOCKED_HOSTS);
   }
 
   await cache.put(cacheKey, response.clone());
