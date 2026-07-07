@@ -54,6 +54,7 @@ async function processSvgToPng(sourceUrl: URL, options: TransformOptions): Promi
         break;
       }
 
+      response.body?.cancel();
       lastStatus = response.status;
     } catch {
       lastStatus = 502;
