@@ -17,4 +17,9 @@ describe('buildSourceFetchCandidates', () => {
     const candidates = buildSourceFetchCandidates(new URL('https://example.com/logo.svg'));
     expect(candidates.map((value) => value.toString())).toEqual(['https://example.com/logo.svg']);
   });
+
+  it('does not add fallback when stripping www would yield an IP literal', () => {
+    const candidates = buildSourceFetchCandidates(new URL('https://www.127.0.0.1/logo.svg'));
+    expect(candidates.map((value) => value.toString())).toEqual(['https://www.127.0.0.1/logo.svg']);
+  });
 });
