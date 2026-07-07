@@ -1,0 +1,2 @@
+# Optional. Comma-separated list of additional hostnames to block.
+# BLOCKED_HOSTS=internal.example.local,metadata.google.internal
